@@ -214,64 +214,64 @@ def write_to_sheets(kill_data, sheet_id, credentials_json, date_str=None):
         pass
 
     all_values = worksheet.get_all_values()
-    # Convert all rows to mutable lists
-    all_values = [list(row) for row in all_values]
 
     if not all_values:
         all_values = [["Rank", "Member Name"]]
 
-    headers = all_values[0]
+    headers = list(all_values[0])
 
     if date_str in headers:
         date_col_idx = headers.index(date_str)
     else:
         date_col_idx = len(headers)
         headers.append(date_str)
-        all_values[0] = headers  # Ensure reference is updated
 
-    # Calculate required columns
-    num_cols = max(len(headers), date_col_idx + 1)
+    num_cols = len(headers)
 
-    # Helper to pad a row to num_cols
-    def pad_row(row):
-        return row + [""] * (num_cols - len(row)) if len(row) < num_cols else row
+    # Build a dict of member data: name -> {col_idx: value, ...}
+    member_order = []  # Preserve row order
+    member_data = {}   # name -> dict of col values
 
-    # Pad all existing rows
-    all_values = [pad_row(list(row)) for row in all_values]
-
-    # Build member lookup
-    existing_members = {}
-    for row_idx, row in enumerate(all_values[1:], start=1):
+    for row in all_values[1:]:
         if len(row) >= 2 and row[1]:
-            existing_members[row[1]] = row_idx
+            name = row[1]
+            if name not in member_data:
+                member_order.append(name)
+                member_data[name] = {}
+            # Copy existing column values
+            for col_idx, val in enumerate(row):
+                member_data[name][col_idx] = val
 
+    # Apply new kill data
     for entry in kill_data:
         raw_name = entry["name"]
         name = aliases.get(raw_name, raw_name)
         rank = entry["rank"]
         kills = entry["kills"]
 
-        if name in existing_members:
-            row_idx = existing_members[name]
-        else:
-            row_idx = len(all_values)
-            all_values.append([])
-            existing_members[name] = row_idx
+        if name not in member_data:
+            member_order.append(name)
+            member_data[name] = {}
 
-        # Guarantee row has enough columns before writing
-        while len(all_values[row_idx]) < num_cols:
-            all_values[row_idx].append("")
+        member_data[name][0] = rank           # Rank column
+        member_data[name][1] = name           # Name column
+        member_data[name][date_col_idx] = kills  # Kill count
 
-        all_values[row_idx][0] = rank
-        all_values[row_idx][1] = name
-        all_values[row_idx][date_col_idx] = kills
+    # Build the final grid from the dict
+    output = [headers]
+    for name in member_order:
+        row = [""] * num_cols
+        for col_idx, val in member_data[name].items():
+            if col_idx < num_cols:
+                row[col_idx] = val
+        output.append(row)
 
-    # Convert numeric strings to int
-    for i in range(len(all_values)):
-        for j in range(len(all_values[i])):
-            cell = all_values[i][j]
+    # Convert numeric strings to int for proper Sheets formatting
+    for i in range(len(output)):
+        for j in range(len(output[i])):
+            cell = output[i][j]
             if isinstance(cell, str) and cell.isdigit():
-                all_values[i][j] = int(cell)
+                output[i][j] = int(cell)
 
     def col_letter(n):
         r = ""
@@ -280,8 +280,8 @@ def write_to_sheets(kill_data, sheet_id, credentials_json, date_str=None):
             r = chr(65 + rem) + r
         return r
 
-    range_str = f"A1:{col_letter(num_cols)}{len(all_values)}"
-    worksheet.update(range_str, all_values, value_input_option="RAW")
+    range_str = f"A1:{col_letter(num_cols)}{len(output)}"
+    worksheet.update(range_str, output, value_input_option="RAW")
 
     return len(kill_data)
 
