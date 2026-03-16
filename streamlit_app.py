@@ -255,8 +255,12 @@ def write_to_sheets(kill_data, sheet_id, credentials_json, date_str=None):
             row_idx = existing_members[name]
         else:
             row_idx = len(all_values)
-            all_values.append([""] * num_cols)
+            all_values.append([])
             existing_members[name] = row_idx
+
+        # Guarantee row has enough columns before writing
+        while len(all_values[row_idx]) < num_cols:
+            all_values[row_idx].append("")
 
         all_values[row_idx][0] = rank
         all_values[row_idx][1] = name
