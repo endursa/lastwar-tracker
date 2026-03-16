@@ -246,12 +246,32 @@ def write_to_sheets(kill_data, sheet_id, credentials_json, date_str=None):
             for col_idx, val in enumerate(row):
                 member_data[name][col_idx] = val
 
+    # Fuzzy matching: find existing name that closely matches
+    from difflib import SequenceMatcher
+
+    def find_matching_name(new_name, existing_names, threshold=0.90):
+        """Find an existing name that's very similar to new_name (OCR tolerance)."""
+        best_match = None
+        best_ratio = 0
+        for existing in existing_names:
+            ratio = SequenceMatcher(None, new_name, existing).ratio()
+            if ratio >= threshold and ratio > best_ratio:
+                best_match = existing
+                best_ratio = ratio
+        return best_match
+
     # Apply new kill data
     for entry in kill_data:
         raw_name = entry["name"]
         name = aliases.get(raw_name, raw_name)
         rank = entry["rank"]
         kills = entry["kills"]
+
+        # Check for fuzzy match against existing members
+        if name not in member_data:
+            matched = find_matching_name(name, member_data.keys())
+            if matched:
+                name = matched  # Use existing canonical name
 
         if name not in member_data:
             member_order.append(name)
