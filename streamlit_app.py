@@ -215,17 +215,21 @@ def write_to_sheets(kill_data, sheet_id, credentials_json, date_str=None):
 
     all_values = worksheet.get_all_values()
 
-    if not all_values:
-        all_values = [["Rank", "Member Name"]]
-
-    headers = list(all_values[0])
-
-    if date_str in headers:
-        date_col_idx = headers.index(date_str)
+    # Always enforce proper header structure
+    # Headers MUST start with "Rank", "Member Name", then date columns
+    if not all_values or len(all_values[0]) < 2 or all_values[0][0] != "Rank":
+        # Sheet is empty or has corrupted headers — start fresh
+        existing_dates = []
+        all_values = []
     else:
-        date_col_idx = len(headers)
-        headers.append(date_str)
+        # Extract existing date columns (everything after Rank and Member Name)
+        existing_dates = all_values[0][2:]
 
+    # Build proper headers
+    headers = ["Rank", "Member Name"] + existing_dates
+    if date_str not in headers:
+        headers.append(date_str)
+    date_col_idx = headers.index(date_str)
     num_cols = len(headers)
 
     # Build a dict of member data: name -> {col_idx: value, ...}
