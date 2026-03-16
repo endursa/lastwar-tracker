@@ -295,11 +295,19 @@ gemini_key = get_secret("GEMINI_API_KEY")
 sheet_id = get_secret("GOOGLE_SHEET_ID")
 credentials_json = get_credentials_from_secrets()
 
-# Only show sidebar if secrets are missing (i.e. user needs to provide them)
-secrets_complete = bool(gemini_key and sheet_id and credentials_json)
+
+def extract_sheet_id(url_or_id: str) -> str:
+    """Extract sheet ID from a full Google Sheets URL or return as-is if already an ID."""
+    import re
+    match = re.search(r"/spreadsheets/d/([a-zA-Z0-9_-]+)", url_or_id)
+    if match:
+        return match.group(1)
+    return url_or_id.strip()
+
 
 with st.sidebar:
-    if not secrets_complete:
+    # Only show API key / credentials fields if secrets are missing
+    if not (gemini_key and credentials_json):
         st.markdown("## ⚙️ Configuration")
 
         if not gemini_key:
@@ -307,13 +315,6 @@ with st.sidebar:
                 "Gemini API Key",
                 type="password",
                 help="Get yours at aistudio.google.com/apikey",
-            )
-
-        if not sheet_id:
-            st.markdown("### 📊 Google Sheets")
-            sheet_id = st.text_input(
-                "Google Sheet ID",
-                help="From the sheet URL: docs.google.com/spreadsheets/d/**THIS_PART**/edit",
             )
 
         if not credentials_json:
@@ -326,6 +327,16 @@ with st.sidebar:
                 credentials_json = credentials_file.read().decode("utf-8")
 
         st.markdown("---")
+
+    # Sheet URL/ID is always visible so users can easily switch sheets
+    st.markdown("### 📊 Google Sheet")
+    sheet_input = st.text_input(
+        "Sheet URL or ID",
+        value=sheet_id,
+        help="Paste the full Google Sheets URL or just the sheet ID",
+    )
+    if sheet_input:
+        sheet_id = extract_sheet_id(sheet_input)
 
     st.markdown("### 📅 Date")
     custom_date = st.date_input(
