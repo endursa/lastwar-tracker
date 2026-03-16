@@ -230,9 +230,10 @@ def write_to_sheets(kill_data, sheet_id, credentials_json, date_str=None):
         if len(row) >= 2 and row[1]:
             existing_members[row[1]] = row_idx
 
-    num_cols = len(headers)
-    for i, row in enumerate(all_values):
-        while len(row) < num_cols:
+    num_cols = max(len(headers), date_col_idx + 1)
+    # Ensure ALL rows (including header) have enough columns
+    for i in range(len(all_values)):
+        while len(all_values[i]) < num_cols:
             all_values[i].append("")
 
     for entry in kill_data:
@@ -247,6 +248,10 @@ def write_to_sheets(kill_data, sheet_id, credentials_json, date_str=None):
             row_idx = len(all_values)
             all_values.append([""] * num_cols)
             existing_members[name] = row_idx
+
+        # Ensure this specific row has enough columns
+        while len(all_values[row_idx]) < num_cols:
+            all_values[row_idx].append("")
 
         all_values[row_idx][0] = rank
         all_values[row_idx][1] = name
