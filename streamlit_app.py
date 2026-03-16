@@ -271,37 +271,63 @@ def write_to_sheets(kill_data, sheet_id, credentials_json, date_str=None):
     return len(kill_data)
 
 
-# --- Sidebar: Settings ---
+# --- Helper: Load secrets safely ---
+def get_secret(key, default=""):
+    """Get a secret from Streamlit secrets, return default if not found."""
+    try:
+        return st.secrets.get(key, default)
+    except Exception:
+        return default
+
+
+def get_credentials_from_secrets():
+    """Try to build credentials JSON from Streamlit secrets."""
+    try:
+        creds = st.secrets["google_credentials"]
+        # Convert AttrDict to regular dict
+        return json.dumps(dict(creds))
+    except Exception:
+        return None
+
+
+# --- Load secrets silently ---
+gemini_key = get_secret("GEMINI_API_KEY")
+sheet_id = get_secret("GOOGLE_SHEET_ID")
+credentials_json = get_credentials_from_secrets()
+
+# Only show sidebar if secrets are missing (i.e. user needs to provide them)
+secrets_complete = bool(gemini_key and sheet_id and credentials_json)
+
 with st.sidebar:
-    st.markdown("## ⚙️ Configuration")
+    if not secrets_complete:
+        st.markdown("## ⚙️ Configuration")
 
-    gemini_key = st.text_input(
-        "Gemini API Key",
-        type="password",
-        help="Get yours at aistudio.google.com/apikey",
-    )
+        if not gemini_key:
+            gemini_key = st.text_input(
+                "Gemini API Key",
+                type="password",
+                help="Get yours at aistudio.google.com/apikey",
+            )
 
-    st.markdown("---")
-    st.markdown("### 📊 Google Sheets")
+        if not sheet_id:
+            st.markdown("### 📊 Google Sheets")
+            sheet_id = st.text_input(
+                "Google Sheet ID",
+                help="From the sheet URL: docs.google.com/spreadsheets/d/**THIS_PART**/edit",
+            )
 
-    sheet_id = st.text_input(
-        "Google Sheet ID",
-        help="From the sheet URL: docs.google.com/spreadsheets/d/**THIS_PART**/edit",
-    )
+        if not credentials_json:
+            credentials_file = st.file_uploader(
+                "Service Account JSON",
+                type=["json"],
+                help="Upload your Google service account credentials file",
+            )
+            if credentials_file:
+                credentials_json = credentials_file.read().decode("utf-8")
 
-    credentials_file = st.file_uploader(
-        "Service Account JSON",
-        type=["json"],
-        help="Upload your Google service account credentials file",
-    )
+        st.markdown("---")
 
-    credentials_json = None
-    if credentials_file:
-        credentials_json = credentials_file.read().decode("utf-8")
-        st.success("✅ Credentials loaded")
-
-    st.markdown("---")
-    st.markdown("### 📅 Date Override")
+    st.markdown("### 📅 Date")
     custom_date = st.date_input(
         "Data date",
         value=datetime.now(),

@@ -2,6 +2,7 @@
 
 # Local files
 .env
+.streamlit/
 credentials/
 screenshots/
 *.log
