@@ -1,0 +1,24 @@
+# Last War Kill Tracker
+
+# Local files
+.env
+credentials/
+screenshots/
+*.log
+backup_kills_*.json
+nav_config.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
