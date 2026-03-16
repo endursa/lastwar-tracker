@@ -248,9 +248,21 @@ def write_to_sheets(kill_data, sheet_id, credentials_json, date_str=None):
 
     # Fuzzy matching: find existing name that closely matches
     from difflib import SequenceMatcher
+    import unicodedata
 
-    def find_matching_name(new_name, existing_names, threshold=0.90):
-        """Find an existing name that's very similar to new_name (OCR tolerance)."""
+    def normalize_name(name):
+        """Strip accents/diacritics for comparison. Èmmå → Emma"""
+        nfkd = unicodedata.normalize("NFKD", name)
+        return "".join(c for c in nfkd if not unicodedata.combining(c))
+
+    def find_matching_name(new_name, existing_names, threshold=0.85):
+        """Find an existing name that matches via normalization or fuzzy match."""
+        norm_new = normalize_name(new_name)
+        # First: exact match on normalized names
+        for existing in existing_names:
+            if normalize_name(existing) == norm_new:
+                return existing
+        # Second: fuzzy match on original names
         best_match = None
         best_ratio = 0
         for existing in existing_names:
