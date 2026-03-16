@@ -516,6 +516,122 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
+# --- Comparison Section ---
+st.markdown("---")
+st.markdown("### 📈 Kill Comparison")
+
+if sheet_id and credentials_json:
+    compare_clicked = st.button("🔄 Load comparison from Google Sheets", use_container_width=True)
+
+    if compare_clicked:
+        with st.spinner("📊 Loading data from Google Sheets..."):
+            try:
+                creds_dict = json.loads(credentials_json)
+                creds = Credentials.from_service_account_info(creds_dict, scopes=[
+                    "https://www.googleapis.com/auth/spreadsheets",
+                    "https://www.googleapis.com/auth/drive",
+                ])
+                gc = gspread.authorize(creds)
+                spreadsheet = gc.open_by_key(sheet_id)
+                ws = spreadsheet.worksheet("Kill Tracker")
+                all_data = ws.get_all_values()
+
+                if not all_data or len(all_data[0]) < 4:
+                    st.warning("⚠️ Need at least 2 date columns to compare. Upload more data first.")
+                else:
+                    headers = all_data[0]
+                    # Date columns start at index 2 (after Rank, Member Name)
+                    date_cols = headers[2:]
+
+                    if len(date_cols) < 2:
+                        st.warning("⚠️ Need at least 2 date columns to compare.")
+                    else:
+                        # Use the two newest dates
+                        newest_date = date_cols[-1]
+                        prev_date = date_cols[-2]
+                        newest_idx = headers.index(newest_date)
+                        prev_idx = headers.index(prev_date)
+
+                        st.info(f"📅 Comparing **{prev_date}** → **{newest_date}**")
+
+                        comparison = []
+                        for row in all_data[1:]:
+                            if len(row) > max(newest_idx, prev_idx) and row[1]:
+                                name = row[1]
+                                try:
+                                    new_kills = int(str(row[newest_idx]).replace(",", "")) if row[newest_idx] else 0
+                                    old_kills = int(str(row[prev_idx]).replace(",", "")) if row[prev_idx] else 0
+                                except ValueError:
+                                    continue
+
+                                if old_kills > 0 and new_kills > 0:
+                                    delta = new_kills - old_kills
+                                    pct = round((delta / old_kills) * 100, 2) if old_kills > 0 else 0
+                                    comparison.append({
+                                        "Player": name,
+                                        "Previous": old_kills,
+                                        "Current": new_kills,
+                                        "Delta": delta,
+                                        "% Change": pct,
+                                    })
+
+                        if comparison:
+                            # Sort by % Change descending
+                            comparison.sort(key=lambda x: x["% Change"], reverse=True)
+
+                            # Stat cards
+                            col1, col2, col3 = st.columns(3)
+                            top = comparison[0]
+                            avg_pct = round(sum(c["% Change"] for c in comparison) / len(comparison), 2)
+                            total_delta = sum(c["Delta"] for c in comparison)
+
+                            with col1:
+                                st.markdown(f"""
+                                <div class="stat-card">
+                                    <h3>{top["Player"]}</h3>
+                                    <p>Top Improver ({top["% Change"]}%)</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            with col2:
+                                st.markdown(f"""
+                                <div class="stat-card">
+                                    <h3>{avg_pct}%</h3>
+                                    <p>Average Improvement</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            with col3:
+                                st.markdown(f"""
+                                <div class="stat-card">
+                                    <h3>+{total_delta:,}</h3>
+                                    <p>Total Kill Increase</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+
+                            st.markdown("")
+
+                            # Build display table
+                            df_compare = pd.DataFrame(comparison)
+                            df_compare.index = range(1, len(df_compare) + 1)
+                            df_compare["Previous"] = df_compare["Previous"].apply(lambda x: f"{x:,}")
+                            df_compare["Current"] = df_compare["Current"].apply(lambda x: f"{x:,}")
+                            df_compare["Delta"] = df_compare["Delta"].apply(lambda x: f"+{x:,}" if x >= 0 else f"{x:,}")
+                            df_compare["% Change"] = df_compare["% Change"].apply(lambda x: f"+{x}%" if x >= 0 else f"{x}%")
+
+                            st.dataframe(
+                                df_compare,
+                                use_container_width=True,
+                                height=min(len(comparison) * 40 + 40, 600),
+                            )
+                        else:
+                            st.warning("⚠️ No comparable data found between the two dates.")
+
+            except Exception as e:
+                import traceback
+                st.error(f"❌ Failed to load comparison: {e}")
+                st.code(traceback.format_exc())
+else:
+    st.info("💡 Configure Google Sheets to view kill comparisons.")
+
 # --- Footer ---
 st.markdown("---")
 st.markdown(
