@@ -214,6 +214,9 @@ def write_to_sheets(kill_data, sheet_id, credentials_json, date_str=None):
         pass
 
     all_values = worksheet.get_all_values()
+    # Convert all rows to mutable lists
+    all_values = [list(row) for row in all_values]
+
     if not all_values:
         all_values = [["Rank", "Member Name"]]
 
@@ -224,17 +227,23 @@ def write_to_sheets(kill_data, sheet_id, credentials_json, date_str=None):
     else:
         date_col_idx = len(headers)
         headers.append(date_str)
+        all_values[0] = headers  # Ensure reference is updated
 
+    # Calculate required columns
+    num_cols = max(len(headers), date_col_idx + 1)
+
+    # Helper to pad a row to num_cols
+    def pad_row(row):
+        return row + [""] * (num_cols - len(row)) if len(row) < num_cols else row
+
+    # Pad all existing rows
+    all_values = [pad_row(list(row)) for row in all_values]
+
+    # Build member lookup
     existing_members = {}
     for row_idx, row in enumerate(all_values[1:], start=1):
         if len(row) >= 2 and row[1]:
             existing_members[row[1]] = row_idx
-
-    num_cols = max(len(headers), date_col_idx + 1)
-    # Ensure ALL rows (including header) have enough columns
-    for i in range(len(all_values)):
-        while len(all_values[i]) < num_cols:
-            all_values[i].append("")
 
     for entry in kill_data:
         raw_name = entry["name"]
@@ -249,17 +258,14 @@ def write_to_sheets(kill_data, sheet_id, credentials_json, date_str=None):
             all_values.append([""] * num_cols)
             existing_members[name] = row_idx
 
-        # Ensure this specific row has enough columns
-        while len(all_values[row_idx]) < num_cols:
-            all_values[row_idx].append("")
-
         all_values[row_idx][0] = rank
         all_values[row_idx][1] = name
         all_values[row_idx][date_col_idx] = kills
 
     # Convert numeric strings to int
-    for i, row in enumerate(all_values):
-        for j, cell in enumerate(row):
+    for i in range(len(all_values)):
+        for j in range(len(all_values[i])):
+            cell = all_values[i][j]
             if isinstance(cell, str) and cell.isdigit():
                 all_values[i][j] = int(cell)
 
@@ -475,7 +481,9 @@ if uploaded_files:
                     </div>
                     """, unsafe_allow_html=True)
                 except Exception as e:
+                    import traceback
                     st.error(f"❌ Failed to write to Sheets: {e}")
+                    st.code(traceback.format_exc())
 
         # Download as JSON
         st.markdown("")
