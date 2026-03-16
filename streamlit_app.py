@@ -484,6 +484,10 @@ if uploaded_files:
                         ✅ Successfully wrote {count} members to Google Sheets for {date_str}
                     </div>
                     """, unsafe_allow_html=True)
+                    # Debug: show sample data that was written
+                    st.caption("Sample data sent to Sheets:")
+                    sample = [{"rank": r["rank"], "name": r["name"], "kills": r["kills"]} for r in results[:5]]
+                    st.json(sample)
                 except Exception as e:
                     import traceback
                     st.error(f"❌ Failed to write to Sheets: {e}")
